@@ -22,7 +22,6 @@ FFMPEG_OPTIONS = {
     )
 }
 
-
 class AudioPlayerSession:
     def __init__(self, voice_channel: disnake.VoiceChannel) -> None:
         self.LIMIT_QUEUE = 25
@@ -62,7 +61,7 @@ class AudioPlayerSession:
                     log.error(f"Playback error: {error}")
                 self.next_song_event.set()
 
-            self.vc.play(FFmpegPCMAudio(song.url, **FFMPEG_OPTIONS), after=after_playing)
+            self.vc.play(FFmpegPCMAudio(song.steame_url, **FFMPEG_OPTIONS), after=after_playing)
             await self.next_song_event.wait()
             self.queue.task_done()
 

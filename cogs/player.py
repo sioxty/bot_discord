@@ -2,12 +2,13 @@ import logging
 
 import disnake
 from disnake.ext import commands
-from .core import YouTubeClient, ManagementSession, song_embed, get_preview
+from .core import SoundCloudClient, ManagementSession, song_embed
 from .core.exception import NotFoundSong
 from .core.interface import ISongAPI
 
+
 log = logging.getLogger(__name__)
-api: ISongAPI = YouTubeClient()
+api: ISongAPI = SoundCloudClient()
 manager = ManagementSession()
 
 
@@ -18,15 +19,15 @@ class Player(commands.Cog):
     @commands.slash_command(name="play")
     async def play(self, inter: disnake.ApplicationCommandInteraction, query: str):
         try:
+            if not inter.author.voice:
+                return await inter.send("You are not connected to a voice channel.")
             session = await manager.get_session(inter.author.voice.channel)
             log.info(f"Playing {manager.sessions}")
             await inter.response.defer()
             song = await api.get_song(query)
             await session.add_song(song)
-            file = await get_preview(song.thumbnail)
             embed = await song_embed(song)
-            embed.set_thumbnail(url="attachment://preview.jpg")
-            await inter.send(embed=embed, file=file)
+            await inter.send(embed=embed)
         except NotFoundSong:
             await inter.send("Song not found.")
 
@@ -55,10 +56,6 @@ class Player(commands.Cog):
             return
         session.vc.stop()
         await inter.send("Skipped.")
-
-    @commands.command(name="sessions")
-    async def sessions(self, ctx):
-        await ctx.send(f"Sessions: {manager.sessions}")
 
 
 def setup(bot):
