@@ -4,6 +4,8 @@ from asyncio import Queue, Event, create_task
 import disnake
 from disnake import FFmpegPCMAudio
 
+from .exception import LimitQueue
+
 from .schemas import SongDTO
 
 log = logging.getLogger(__name__)
@@ -35,6 +37,8 @@ class AudioPlayerSession:
         return f"<AudioPlayerSession voice_channel={self.voice_channel.id}>"
 
     async def add_song(self, song: SongDTO):
+        if self.queue.full():
+            raise LimitQueue(f"{self.LIMIT_QUEUE} songs in queue")
         await self.queue.put(song)
         log.info(f"Added {song.title} to queue.")
         if not self.vc or not self.vc.is_playing():
@@ -46,8 +50,6 @@ class AudioPlayerSession:
 
     async def play(self):
         await self.connect()
-
-        # Якщо вже щось грає – не запускаємо ще раз
         if self.vc.is_playing() or self.next_song_event.is_set():
             return
 
@@ -56,17 +58,20 @@ class AudioPlayerSession:
             log.info(f"🎵 Playing {song.title}")
             self.next_song_event.clear()
 
+            # Define a callback function to be executed after the current song finishes playing.
             def after_playing(error=None):
                 if error:
-                    log.error(f"Playback error: {error}")
-                self.next_song_event.set()
+                    log.error(f"Playback error: {error}")  # Log any playback errors.
+                self.next_song_event.set()  # Signal that the current song has finished.
 
+            
             self.vc.play(FFmpegPCMAudio(song.steame_url, **FFMPEG_OPTIONS), after=after_playing)
             await self.next_song_event.wait()
             self.queue.task_done()
 
         await self.vc.disconnect()
         self._is_playing_loop = False
+
 
 
 class ManagementSession:

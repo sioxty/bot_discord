@@ -2,7 +2,6 @@ from .schemas import SongDTO
 from disnake import Embed
 
 
-
 async def song_embed(song: SongDTO) -> Embed:
     time=song.duration // 1000
     embed = Embed(
@@ -17,5 +16,3 @@ async def song_embed(song: SongDTO) -> Embed:
         icon_url=song.user.avatar_url,
     )
     return embed
-
-

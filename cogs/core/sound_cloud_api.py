@@ -5,13 +5,13 @@ import aiohttp
 from .interface import ISongAPI
 from .schemas import SongDTO, song_dto_from_dict
 from .exception import NotFoundSong
-from cachetools import TTLCache, cached
+from cachetools import TTLCache
 
 log = logging.getLogger(__name__)
 class SoundCloudClient(ISongAPI):
     def __init__(self):
         self._client_id = None
-        self._cache = TTLCache(maxsize=100, ttl=3600)  # 1 hour TTL
+        self._cache = TTLCache(maxsize=100, ttl=60*4)  # 1 hour TTL
 
     async def _get_client_id(self, session: aiohttp.ClientSession) -> str:
         if self._client_id:

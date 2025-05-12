@@ -2,8 +2,9 @@ import logging
 
 import disnake
 from disnake.ext import commands
-from .core import SoundCloudClient, ManagementSession, song_embed
-from .core.exception import NotFoundSong
+from .core import SoundCloudClient, ManagementSession
+from .core.view import song_embed
+from .core.exception import LimitQueue, NotFoundSong
 from .core.interface import ISongAPI
 
 
@@ -22,7 +23,6 @@ class Player(commands.Cog):
             if not inter.author.voice:
                 return await inter.send("You are not connected to a voice channel.")
             session = await manager.get_session(inter.author.voice.channel)
-            log.info(f"Playing {manager.sessions}")
             await inter.response.defer()
             song = await api.get_song(query)
             await session.add_song(song)
@@ -30,12 +30,16 @@ class Player(commands.Cog):
             await inter.send(embed=embed)
         except NotFoundSong:
             await inter.send("Song not found.")
+        except LimitQueue:
+            await inter.send(f"Queue is full, max {session.LIMIT_QUEUE} songs.")
 
     @commands.slash_command(name="stop")
     async def stop(self, inter: disnake.ApplicationCommandInteraction):
         if not inter.author.voice:
             return await inter.send("You are not connected to a voice channel.")
         session = await manager.get_session(inter.author.voice.channel)
+        if session.vc is None:
+            return await inter.send("Not connected to a voice channel.")
         await session.vc.disconnect()
         await inter.send("Disconnected.")
         manager.sessions.remove(session)

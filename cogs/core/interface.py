@@ -1,10 +1,9 @@
-from abc import ABC, abstractmethod
+from typing import Protocol
 
 from .schemas import SongDTO
 
 
-class ISongAPI(ABC):
-    @abstractmethod
+class ISongAPI(Protocol):
     async def get_song(self, query: str) -> SongDTO:
         """
         get song
