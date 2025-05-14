@@ -1,8 +1,8 @@
-from .schemas import SongDTO
+from aiosoundcloud.schemas import Track
 from disnake import Embed
 
 
-async def song_embed(song: SongDTO) -> Embed:
+async def song_embed(song: Track) -> Embed:
     time=song.duration // 1000
     embed = Embed(
         title=song.title,

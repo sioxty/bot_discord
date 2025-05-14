@@ -32,4 +32,4 @@ This project is a Discord bot built to automate tasks and enhance server functio
 Feel free to submit issues or pull requests to improve the project.
 
 ## License
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](LICENSE.txt).

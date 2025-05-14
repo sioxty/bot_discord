@@ -2,34 +2,52 @@ import logging
 
 import disnake
 from disnake.ext import commands
-from .core import SoundCloudClient, ManagementSession
+from aiosoundcloud import SoundCloud
+from .core import ManagementSession
+from .core.audio_player_session import AudioPlayerSession
 from .core.view import song_embed
-from .core.exception import LimitQueue, NotFoundSong
-from .core.interface import ISongAPI
+from .core.exception import LimitQueue, NotConnectedVoice
+from config import CLIENT_ID
 
 
 log = logging.getLogger(__name__)
-api: ISongAPI = SoundCloudClient()
-manager = ManagementSession()
+api = SoundCloud(client_id=CLIENT_ID)
+manager = ManagementSession(api=api)
 
+
+async def is_voice_connected(inter: disnake.ApplicationCommandInteraction):
+    if not inter.author.voice:
+        raise NotConnectedVoice("Not connected to a voice channel")
+
+async def soundcloud_autocomplete(inter, string: str):
+    limit = 5
+    if not string or len(string) < 3:
+        return []
+
+    results = await api.search(query=string, limit=limit)
+    return [
+        disnake.OptionChoice(name=f"{track.title} - {track.user.username}"[:100], value=track.title)
+        for track in results[:limit]
+    ]
 
 class Player(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
     @commands.slash_command(name="play")
-    async def play(self, inter: disnake.ApplicationCommandInteraction, query: str):
+    async def play(self, inter: disnake.ApplicationCommandInteraction, query: str = commands.Param(autocomplete=soundcloud_autocomplete)):
         try:
             if not inter.author.voice:
                 return await inter.send("You are not connected to a voice channel.")
-            session = await manager.get_session(inter.author.voice.channel)
+            session: AudioPlayerSession = await manager.get_session(inter.author.voice.channel)
             await inter.response.defer()
-            song = await api.get_song(query)
-            await session.add_song(song)
-            embed = await song_embed(song)
+            songs = await api.search(query,limit=1)
+            if not songs:
+                await inter.send("Song not found.")
+                return
+            await session.add_song(songs[0])
+            embed = await song_embed(songs[0])
             await inter.send(embed=embed)
-        except NotFoundSong:
-            await inter.send("Song not found.")
         except LimitQueue:
             await inter.send(f"Queue is full, max {session.LIMIT_QUEUE} songs.")
 
@@ -38,28 +56,20 @@ class Player(commands.Cog):
         if not inter.author.voice:
             return await inter.send("You are not connected to a voice channel.")
         session = await manager.get_session(inter.author.voice.channel)
-        if session.vc is None:
-            return await inter.send("Not connected to a voice channel.")
-        await session.vc.disconnect()
+        await session.stop()
         await inter.send("Disconnected.")
         manager.sessions.remove(session)
 
     @commands.slash_command(name="skip")
     async def skip(self, inter: disnake.ApplicationCommandInteraction):
-        if not inter.author.voice:
-            await inter.send("You are not connected to a voice channel.")
-            return
-        session = await manager.get_session(inter.author.voice.channel)
-        if not session.vc is not None or not session.vc.is_playing():
-            await inter.send("Nothing is playing.")
-            return
-        if session.queue.empty():
-            await session.vc.disconnect()
-            manager.sessions.remove(session)
-            await inter.send("Disconnected.")
-            return
-        session.vc.stop()
-        await inter.send("Skipped.")
+        try:
+            await is_voice_connected(inter)
+            session = await manager.get_session(inter.author.voice.channel)
+            await session.skip()
+            await inter.send("Skipped.")
+        except NotConnectedVoice:
+            await inter.send("Not connected to a voice channel.")
+
 
 
 def setup(bot):

@@ -1,0 +1,32 @@
+MIT License (Modified – SioxtyBot License v1.0 Addendum)
+
+Copyright (c) 2025 Sioxty
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the “Software”), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, subject to the following conditions:
+
+1. The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+2. The following additional restriction applies:
+
+   - It is strictly forbidden to sell or offer paid access to any features or functionality
+     implemented in this Software, either as-is or in modified form, whether standalone
+     or integrated into a larger system.
+
+   - This includes (but is not limited to) usage in commercial services (e.g. paid Discord bots,
+     SaaS platforms, premium subscriptions) where this Software’s logic is part of the offering.
+
+   - You may not charge users for access to this Software's contributions, even as part of
+     a larger product. Derivative works must keep all functionality derived from this Software
+     free of charge for end users.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
