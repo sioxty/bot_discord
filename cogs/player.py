@@ -41,12 +41,15 @@ class Player(commands.Cog):
                 return await inter.send("You are not connected to a voice channel.")
             session: AudioPlayerSession = await manager.get_session(inter.author.voice.channel)
             await inter.response.defer()
-            songs = await api.search(query,limit=1)
-            if not songs:
+            result = await api.search(query, limit=1)
+
+            if not result:
                 await inter.send("Song not found.")
                 return
-            await session.add_song(songs[0])
-            embed = await song_embed(songs[0])
+
+            song = result[0]
+            await session.add_song(song)
+            embed = await song_embed(song)
             await inter.send(embed=embed)
         except LimitQueue:
             await inter.send(f"Queue is full, max {session.LIMIT_QUEUE} songs.")

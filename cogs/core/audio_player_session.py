@@ -7,6 +7,7 @@ from aiosoundcloud.schemas import Track
 from disnake import FFmpegPCMAudio
 
 from .exception import LimitQueue, NotConnectedVoice
+from config import FFMPEG_PATH
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ FFMPEG_OPTIONS = {
 }
 
 class AudioPlayerSession:
-    def __init__(self, voice_channel: disnake.VoiceChannel,api) -> None:
+    def __init__(self, voice_channel: disnake.VoiceChannel,api:SoundCloud) -> None:
         self.LIMIT_QUEUE = 25
         self.voice_channel = voice_channel
         self.queue: Queue[Track] = Queue(maxsize=self.LIMIT_QUEUE)
@@ -42,7 +43,7 @@ class AudioPlayerSession:
             raise LimitQueue(f"{self.LIMIT_QUEUE} songs in queue")
         await self.queue.put(song)
 
-        if not self.vc or not self.vc.is_playing():
+        if not self.vc:
             create_task(self.play())
 
     async def connect(self):
@@ -51,8 +52,6 @@ class AudioPlayerSession:
 
     async def play(self):
         await self.connect()
-        if self.vc.is_playing() or self.next_song_event.is_set():
-            return
 
         while not self.queue.empty():
             song = await self.queue.get()
@@ -65,11 +64,12 @@ class AudioPlayerSession:
                 self.next_song_event.set()  # Signal that the current song has finished.
 
             stream_url = await self.api.get_stream_url(song)
-            self.vc.play(FFmpegPCMAudio(stream_url, **FFMPEG_OPTIONS), after=after_playing)
+            self.vc.play(FFmpegPCMAudio(stream_url, **FFMPEG_OPTIONS,executable=FFMPEG_PATH), after=after_playing)
             await self.next_song_event.wait()
             self.queue.task_done()
 
         await self.vc.disconnect()
+        self.vc = None
         self._is_playing_loop = False
 
     async def stop(self):
