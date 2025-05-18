@@ -56,12 +56,16 @@ class Player(commands.Cog):
 
     @commands.slash_command(name="stop")
     async def stop(self, inter: disnake.ApplicationCommandInteraction):
-        if not inter.author.voice:
-            return await inter.send("You are not connected to a voice channel.")
-        session = await manager.get_session(inter.author.voice.channel)
-        await session.stop()
-        await inter.send("Disconnected.")
-        manager.sessions.remove(session)
+        try:
+            if not inter.author.voice:
+                return await inter.send("You are not connected to a voice channel.")
+            session = await manager.get_session(inter.author.voice.channel)
+            await session.stop()
+            await inter.send("Disconnected.")
+            manager.sessions.remove(session)
+        except NotConnectedVoice:
+            await inter.send("You are not connected to a voice channel.")
+
 
     @commands.slash_command(name="skip")
     async def skip(self, inter: disnake.ApplicationCommandInteraction):
