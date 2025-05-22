@@ -1,7 +1,10 @@
-.venv/
-*.env
-.idea/
-.vscode/
+.venv
+venv
+.idea
+.vscode
 __pycache__
 README.md
 LECENSE.txt
+.git
+.github
+*.log
