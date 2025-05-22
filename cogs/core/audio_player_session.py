@@ -7,7 +7,6 @@ from aiosoundcloud.schemas import Track
 from disnake import FFmpegPCMAudio
 
 from .exception import LimitQueue, NotConnectedVoice
-from config import FFMPEG_PATH
 
 log = logging.getLogger(__name__)
 
@@ -64,7 +63,7 @@ class AudioPlayerSession:
                 self.next_song_event.set()  # Signal that the current song has finished.
 
             stream_url = await self.api.get_stream_url(song)
-            self.vc.play(FFmpegPCMAudio(stream_url, **FFMPEG_OPTIONS,executable=FFMPEG_PATH), after=after_playing)
+            self.vc.play(FFmpegPCMAudio(stream_url, **FFMPEG_OPTIONS), after=after_playing)
             await self.next_song_event.wait()
             self.queue.task_done()
 
