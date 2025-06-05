@@ -3,6 +3,7 @@ from typing import Optional, List, Dict, Any
 
 # === USER MODELS ===
 
+
 @dataclass
 class CreatorProduct:
     id: str
@@ -34,7 +35,7 @@ class VisualEntry:
         return VisualEntry(
             urn=data.get("urn", ""),
             entry_time=data.get("entry_time", 0),
-            visual_url=data.get("visual_url", "")
+            visual_url=data.get("visual_url", ""),
         )
 
 
@@ -49,7 +50,7 @@ class Visuals:
         return Visuals(
             urn=data.get("urn", ""),
             enabled=data.get("enabled", False),
-            visuals=[VisualEntry.from_dict(v) for v in data.get("visuals", [])]
+            visuals=[VisualEntry.from_dict(v) for v in data.get("visuals", [])],
         )
 
 
@@ -66,7 +67,7 @@ class ExtendedBadges:
             pro=data.get("pro", False),
             creator_mid_tier=data.get("creator_mid_tier", False),
             pro_unlimited=data.get("pro_unlimited", False),
-            verified=data.get("verified", False)
+            verified=data.get("verified", False),
         )
 
 
@@ -133,18 +134,26 @@ class User:
             station_permalink=data.get("station_permalink", ""),
             verified=data.get("verified", False),
             badges=ExtendedBadges.from_dict(data.get("badges", {})),
-            creator_subscription=CreatorSubscription.from_dict(data.get("creator_subscription", {}))
-                if data.get("creator_subscription") else None,
+            creator_subscription=(
+                CreatorSubscription.from_dict(data.get("creator_subscription", {}))
+                if data.get("creator_subscription")
+                else None
+            ),
             creator_subscriptions=[
                 CreatorSubscription.from_dict(cs["product"])
                 for cs in data.get("creator_subscriptions", [])
                 if "product" in cs
             ],
-            visuals=Visuals.from_dict(data.get("visuals", {})) if data.get("visuals") else None
+            visuals=(
+                Visuals.from_dict(data.get("visuals", {}))
+                if data.get("visuals")
+                else None
+            ),
         )
 
 
 # === TRACK MODEL ===
+
 
 @dataclass
 class Transcoding:
@@ -168,7 +177,7 @@ class Transcoding:
             preset=data.get("preset", ""),
             quality=data.get("quality", ""),
             snipped=data.get("snipped", False),
-            url=data.get("url", "")
+            url=data.get("url", ""),
         )
 
 
@@ -244,6 +253,9 @@ class Track:
             urn=data.get("urn", ""),
             waveform_url=data.get("waveform_url"),
             publisher_metadata=data.get("publisher_metadata", {}),
-            media=[Transcoding.from_dict(t) for t in data.get("media", {}).get("transcodings", [])],
-            user=User.from_dict(data.get("user", {}))
+            media=[
+                Transcoding.from_dict(t)
+                for t in data.get("media", {}).get("transcodings", [])
+            ],
+            user=User.from_dict(data.get("user", {})),
         )

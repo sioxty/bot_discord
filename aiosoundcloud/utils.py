@@ -17,7 +17,9 @@ async def get_client_id() -> str:
         async with session.get("https://soundcloud.com") as resp:
             html = await resp.text()
 
-        js_urls = re.findall(r'src="(https://a-v2\.sndcdn\.com/assets/\w+-\w+\.js)"', html)
+        js_urls = re.findall(
+            r'src="(https://a-v2\.sndcdn\.com/assets/\w+-\w+\.js)"', html
+        )
         for js_url in js_urls:
             async with session.get(js_url) as js_resp:
                 js = await js_resp.text()

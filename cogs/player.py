@@ -5,7 +5,7 @@ from disnake.ext import commands
 from aiosoundcloud import SoundCloud
 from .core import ManagementSession
 from .core.audio_player_session import AudioPlayerSession
-from .core.view import song_embed, FavoriteView
+from .core.view import song_embed
 from .core.exception import LimitQueue, NotConnectedVoice
 from config import CLIENT_ID
 
