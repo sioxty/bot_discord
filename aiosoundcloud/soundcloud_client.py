@@ -92,7 +92,7 @@ class SoundCloudClient:
     async def __sponce(self, url, params=None) -> dict[str, any] | None:
         if params is None:
             params = {"client_id": self.client_id}
-        log.info(f"Making GET request to %s", url)
+        log.debug(f"Making GET request to %s", url)
         async with aiohttp.ClientSession() as session:
             async with session.get(url, params=params) as response:
                 if response.status == 200:

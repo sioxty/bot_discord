@@ -4,9 +4,9 @@ from asyncio import Queue, Event, create_task
 import disnake
 from aiosoundcloud import SoundCloud
 from aiosoundcloud.schemas import Track
-from disnake import FFmpegPCMAudio
+from disnake import FFmpegPCMAudio, VoiceClient
 
-from .exception import LimitQueue, NotConnectedVoice
+from .exception import LimitQueue, NotConnectedVoice, NotPlaySound
 
 log = logging.getLogger(__name__)
 
@@ -22,67 +22,93 @@ FFMPEG_OPTIONS = {
 }
 
 
+class TrackQueue:
+    def __init__(self, limit=25):
+        self._queue = Queue(maxsize=limit)
+
+    async def add(self, track):
+        if self._queue.full():
+            raise LimitQueue("Queue is full")
+        await self._queue.put(track)
+
+    async def get(self):
+        return await self._queue.get()
+
+    def is_empty(self):
+        return self._queue.empty()
+
+    def task_done(self):
+        self._queue.task_done()
+
+    def as_list(self):
+        return list(self._queue._queue)
+
+    def size(self):
+        return self._queue.qsize()
+
+
 class AudioPlayerSession:
     def __init__(self, voice_channel: disnake.VoiceChannel, api: SoundCloud) -> None:
         self.LIMIT_QUEUE = 25
-        self.voice_channel = voice_channel
-        self.queue: Queue[Track] = Queue(maxsize=self.LIMIT_QUEUE)
-        self.next_song_event = Event()
+        self._voice_channel = voice_channel
+        self.queue = TrackQueue()
+        self.__next_song_event = Event()
         self._is_playing_loop = False
+        self._now_play_track: Track | None = None
         self.api = api
-        self.vc = None
+        self._vc: VoiceClient | None = None
 
     def __repr__(self) -> str:
-        return f"<AudioPlayerSession voice_channel={self.voice_channel.id}>"
+        return f"<AudioPlayerSession voice_channel={self._voice_channel.id}>"
 
-    async def add_song(self, song: Track):
-        if self.queue.full():
-            raise LimitQueue(f"{self.LIMIT_QUEUE} songs in queue")
-        await self.queue.put(song)
-
-        if not self.vc:
-            create_task(self.play())
+    async def play(self, track: Track):
+        await self.queue.add(track)
+        if not self._vc:
+            create_task(self.__play())
 
     async def connect(self):
-        if self.vc is None or not self.vc.is_connected():
-            self.vc = await self.voice_channel.connect()
+        if self._vc is None or not self._vc.is_connected():
+            self._vc = await self._voice_channel.connect()
 
-    async def play(self):
+    async def __play(self):
+        await self.__play_loop()
+        await self._vc.disconnect()
+        self._vc = None
+        self._is_playing_loop = False
+
+    async def stop(self):
+        await self._vc.disconnect()
+
+    async def skip(self):
+        if self._vc.is_playing():
+            raise NotPlaySound("Bot don`t play sound")
+        if self.queue.is_empty():
+            await self._vc.disconnect()
+            return
+        self._vc.stop()
+
+    def get_track_play_now(self):
+        return self._now_play_track
+
+    async def __play_loop(self):
         await self.connect()
-
-        while not self.queue.empty():
-            song = await self.queue.get()
-            self.next_song_event.clear()
+        while not self.queue.is_empty():
+            track = await self.queue.get()
+            self._now_play_track = track
+            self.__next_song_event.clear()
 
             # Define a callback function to be executed after the current song finishes playing.
             def after_playing(error=None):
                 if error:
                     log.error(f"Playback error: {error}")  # Log any playback errors.
-                self.next_song_event.set()  # Signal that the current song has finished.
+                self.__next_song_event.set()  # Signal that the current song has finished.
 
-            stream_url = await self.api.get_stream_url(song)
-            self.vc.play(
+            stream_url = await self.api.get_stream_url(track)
+            self._vc.play(
                 FFmpegPCMAudio(stream_url, **FFMPEG_OPTIONS), after=after_playing
             )
-            await self.next_song_event.wait()
+            await self.__next_song_event.wait()
             self.queue.task_done()
-
-        await self.vc.disconnect()
-        self.vc = None
-        self._is_playing_loop = False
-
-    async def stop(self):
-        if self.vc is None:
-            raise NotConnectedVoice("Not connected to a voice channel")
-        await self.vc.disconnect()
-
-    async def skip(self):
-        if self.vc is None or not self.vc.is_playing():
-            raise NotConnectedVoice("Not connected to a voice channel")
-        if self.queue.empty():
-            await self.vc.disconnect()
-            return
-        self.vc.stop()
 
 
 class ManagementSession:
@@ -93,13 +119,18 @@ class ManagementSession:
     async def get_session(
         self, voice_channel: disnake.VoiceChannel
     ) -> AudioPlayerSession:
+        if isinstance(voice_channel, disnake.VoiceChannel):
+            raise NotConnectedVoice("Not connected to a voice channel")
         for session in self.sessions:
-            if session.voice_channel.id == voice_channel.id:
+            if session._voice_channel.id == voice_channel.id:
                 return session
         new_session = AudioPlayerSession(voice_channel, self.api)
         self.sessions.append(new_session)
         log.info(f"Created new session {new_session}")
         return new_session
+
+    def is_session(self, voice_channel: disnake.VoiceChannel):
+        return voice_channel.id in self.sessions
 
     async def close(self, session):
         log.info(f"Closing session {session}")

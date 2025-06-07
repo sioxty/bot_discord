@@ -14,3 +14,7 @@ class NotConnectedUser(Exception):
     """Exception raised when the user is not connected to a voice channel."""
 
     pass
+
+
+class NotPlaySound(Exception):
+    pass
