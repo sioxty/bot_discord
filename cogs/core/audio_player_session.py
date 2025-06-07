@@ -23,7 +23,8 @@ FFMPEG_OPTIONS = {
 
 
 class TrackQueue:
-    def __init__(self, limit=25):
+    def __init__(self, limit):
+        self.LIMIT_QUEUE = limit
         self._queue = Queue(maxsize=limit)
 
     async def add(self, track):
@@ -49,11 +50,10 @@ class TrackQueue:
 
 class AudioPlayerSession:
     def __init__(self, voice_channel: disnake.VoiceChannel, api: SoundCloud) -> None:
-        self.LIMIT_QUEUE = 25
         self._voice_channel = voice_channel
-        self.queue = TrackQueue()
+        self.queue = TrackQueue(limit=25)
         self.__next_song_event = Event()
-        self._is_playing_loop = False
+        # self._is_playing_loop = False
         self._now_play_track: Track | None = None
         self.api = api
         self._vc: VoiceClient | None = None
@@ -74,7 +74,7 @@ class AudioPlayerSession:
         await self.__play_loop()
         await self._vc.disconnect()
         self._vc = None
-        self._is_playing_loop = False
+        # self._is_playing_loop = False
 
     async def stop(self):
         await self._vc.disconnect()
@@ -97,11 +97,10 @@ class AudioPlayerSession:
             self._now_play_track = track
             self.__next_song_event.clear()
 
-            # Define a callback function to be executed after the current song finishes playing.
             def after_playing(error=None):
                 if error:
-                    log.error(f"Playback error: {error}")  # Log any playback errors.
-                self.__next_song_event.set()  # Signal that the current song has finished.
+                    log.error(f"Playback error: {error}")
+                self.__next_song_event.set()
 
             stream_url = await self.api.get_stream_url(track)
             self._vc.play(
@@ -119,7 +118,7 @@ class ManagementSession:
     async def get_session(
         self, voice_channel: disnake.VoiceChannel
     ) -> AudioPlayerSession:
-        if isinstance(voice_channel, disnake.VoiceChannel):
+        if not disnake.VoiceChannel:
             raise NotConnectedVoice("Not connected to a voice channel")
         for session in self.sessions:
             if session._voice_channel.id == voice_channel.id:

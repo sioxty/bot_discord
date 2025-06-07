@@ -38,7 +38,7 @@ class SoundCloud(SoundCloudClient):
             KeyError: If the expected "url" key is not found in the response JSON.
         """
 
-        log.info(f"Fetching stream URL for track: {track.id}")
+        log.debug(f"Fetching stream URL for track: {track.id}")
         async with aiohttp.ClientSession() as session:
             for transcoding in track.media:
                 if transcoding.format_protocol == "progressive":
