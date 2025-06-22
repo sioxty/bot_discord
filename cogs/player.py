@@ -4,7 +4,7 @@ import disnake
 from disnake.ext import commands
 from aiosoundcloud import SoundCloud
 from .core import ManagementSession
-from .core.audio_player_session import AudioPlayerSession
+from .core.audio_player import player_manager, AudioPlayer
 from .core.view import song_embed
 from .core.exception import LimitQueue, NotConnectedVoice, NotPlaySound
 from config import CLIENT_ID
@@ -12,7 +12,6 @@ from config import CLIENT_ID
 
 log = logging.getLogger(__name__)
 api = SoundCloud(client_id=CLIENT_ID)
-manager = ManagementSession(api=api)
 
 
 async def soundcloud_autocomplete(inter, string: str):
@@ -39,25 +38,28 @@ class Player(commands.Cog):
         name="play", description="Play a track from SoundCloud by name or link."
     )
     async def play(self, inter: disnake.ApplicationCommandInteraction, query: str = commands.Param(autocomplete=soundcloud_autocomplete)):  # type: ignore
+        if not inter.author.voice or not inter.author.voice.channel:
+            await inter.send(
+                "You are not connected to a voice channel.", ephemeral=True
+            )
+            return
+
+        result = await api.search(query, limit=1)
+        if not result:
+            await inter.send("Song not found.", ephemeral=True)
+            return
+
+        song = result[0]
+        vc = inter.author.voice.channel
+        session = player_manager.get_session(vc)
+
         try:
-            if not inter.author.voice:  # type: ignore
-                return await inter.send("You are not connected to a voice channel.")
-            session: AudioPlayerSession = await manager.get_session(inter.author.voice.channel)  # type: ignore
-            await inter.response.defer()
-            result = await api.search(query, limit=1)
-
-            if not result:
-                await inter.send("Song not found.")
-                return
-
-            song = result[0]
-            await session.play(song)
+            await session.queue.add(song)
+            await session.play_loop()
             embed = await song_embed(song)
-
             await inter.send(embed=embed)
-
         except LimitQueue:
-            await inter.send(f"Queue is full, max {session.queue.LIMIT_QUEUE} songs.")  # type: ignore
+            await inter.send(f"Queue is full, max {session.queue.LIMIT_QUEUE} songs.")
 
     @commands.slash_command(
         name="stop",
@@ -65,10 +67,10 @@ class Player(commands.Cog):
     )
     async def stop(self, inter: disnake.ApplicationCommandInteraction):
         try:
-            session = await manager.get_session(inter.author.voice.channel)  # type: ignore
+            session = player_manager.get_session(inter.author.voice.channel)  # type: ignore
             await session.stop()
             await inter.send("Disconnected.")
-            manager.sessions.remove(session)
+            player_manager.sessions.remove(session)
         except NotConnectedVoice:
             await inter.send("You are not connected to a voice channel.")
 
@@ -77,7 +79,7 @@ class Player(commands.Cog):
     )
     async def skip(self, inter: disnake.ApplicationCommandInteraction):
         try:
-            session = await manager.get_session(inter.author.voice.channel)  # type: ignore
+            session = player_manager.get_session(inter.author.voice.channel)  # type: ignore
             await session.skip()
             await inter.send("Skipped.")
 
@@ -88,10 +90,10 @@ class Player(commands.Cog):
 
     @commands.slash_command(name="queue", description="Show the current track queue.")
     async def show_queue(self, inter: disnake.ApplicationCommandInteraction):
-        if manager.is_session(inter.author.voice.channel):
+        if player_manager.is_session(inter.author.voice.channel):
             inter.send("Player not play", ephemeral=True)
             return
-        session = await manager.get_session(inter.author.voice.channel)  # type: ignore
+        session = player_manager.get_session(inter.author.voice.channel)  # type: ignore
         queue = session.queue.as_list()
         now_track = session.get_track_play_now()
         if not queue:

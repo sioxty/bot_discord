@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
 
+
 # === USER MODELS ===
 
 
@@ -217,9 +218,10 @@ class Track:
     publisher_metadata: Dict[str, Any]
     media: List[Transcoding]
     user: User
+    api: Any
 
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> "Track":
+    def from_dict(data: Dict[str, Any], api) -> "Track":
         return Track(
             id=data.get("id"),
             title=data.get("title", ""),
@@ -258,4 +260,8 @@ class Track:
                 for t in data.get("media", {}).get("transcodings", [])
             ],
             user=User.from_dict(data.get("user", {})),
+            api=api,
         )
+
+    async def get_stream(self):
+        return self.api.get_stream_url(self)

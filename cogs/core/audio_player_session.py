@@ -53,7 +53,6 @@ class AudioPlayerSession:
         self._voice_channel = voice_channel
         self.queue = TrackQueue(limit=25)
         self.__next_song_event = Event()
-        # self._is_playing_loop = False
         self._now_play_track: Track | None = None
         self.api = api
         self._vc: VoiceClient | None = None
@@ -74,7 +73,6 @@ class AudioPlayerSession:
         await self.__play_loop()
         await self._vc.disconnect()
         self._vc = None
-        # self._is_playing_loop = False
 
     async def stop(self):
         await self._vc.disconnect()

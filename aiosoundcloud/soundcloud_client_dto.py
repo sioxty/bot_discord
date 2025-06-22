@@ -8,16 +8,22 @@ import logging
 log = logging.getLogger(__name__)
 
 # Create a cache with a time-to-live (TTL) of 300 seconds and a max size of 100 items
-cache = TTLCache(maxsize=100, ttl=60 * 60)
+cache = {}
 
 
 class SoundCloud(SoundCloudClient):
     async def search(self, query: str, limit: int = 10) -> list[Track]:
+        key = f"{query}&limit={limit}"
+        if cache.get(key, False):
+            return cache[key]
         response = await super().search(query, limit)
-        return [Track.from_dict(item) for item in response.get("collection", [])]
+        song = [Track.from_dict(item, self) for item in response.get("collection", [])]
+        cache[key] = song
+        return song
 
     async def get_track(self, _id):
-        return Track.from_dict(await super().get_track(_id))
+
+        return Track.from_dict(await super().get_track(_id), self)
 
     async def get_user(self, _id):
         return User.from_dict(await super().get_user(_id))
