@@ -1,16 +1,18 @@
-
 import logging
+from typing import overload
 import aiohttp
 from cachetools import TTLCache
 
+
 log = logging.getLogger(__name__)
 
+
 class SoundCloudClient:
-    def __init__(self,client_id:str):
-        self.BASE_URL= "https://api-v2.soundcloud.com"
-        self.client_id:str = client_id
-    
-    async def search(self,query:str,limit:int=10) -> dict:
+    def __init__(self, client_id: str):
+        self.BASE_URL = "https://api-v2.soundcloud.com"
+        self.client_id: str = client_id
+
+    async def search(self, query: str, limit: int = 10) -> dict:
         """
         Searches for tracks on SoundCloud based on the given query.
         Args:
@@ -21,15 +23,34 @@ class SoundCloudClient:
         Raises:
             Exception: If the request to the SoundCloud API fails or returns an error.
         """
-        
+
         url = f"{self.BASE_URL}/search/tracks?q={query}"
-        params = {
-            'limit':limit,
-            "client_id": self.client_id
-        }
-        return await self.__sponce(url=url,params=params)
-                
-    async def fetch_resolved_url_info(self,url: str) -> dict:
+        params = {"limit": limit, "client_id": self.client_id}
+        return await self.__sponce(url=url, params=params)
+
+    @overload
+    async def get_playlist(self, _id: int, limit: int | None) -> dict: ...
+
+    @overload
+    async def get_playlist(self, url: str, limit: int | None) -> dict: ...
+
+    async def get_playlist(self, arg: str | int, limit: int | None) -> dict:
+        """
+        Retrieves a playlist by its ID or URL from SoundCloud.
+        """
+        # Якщо це int, конвертуємо в str
+        if isinstance(arg, int) or (isinstance(arg, str) and arg.isdigit()):
+            arg_str = str(arg)
+            data = await self.__get_info_for_id("playlists", arg_str)
+            return await self.__get_playlist_for_id(data, limit=limit)
+
+        elif isinstance(arg, str) and arg.startswith("https://soundcloud.com/"):
+            data = await self.fetch_resolved_url_info(arg)
+            return await self.__get_playlist_for_id(data, limit=limit)
+
+        raise ValueError("Invalid playlist identifier")
+
+    async def fetch_resolved_url_info(self, url: str) -> dict:
         """
         Fetches and resolves information about a given SoundCloud URL.
         This method constructs a resolve API endpoint URL using the provided SoundCloud URL
@@ -39,11 +60,11 @@ class SoundCloudClient:
         Returns:
             dict: A dictionary containing the resolved information for the given URL.
         """
-        
+
         url = f"{self.BASE_URL}/resolve?url={url}"
         return await self.__sponce(url=url)
-    
-    async def get_track(self, _id:str):
+
+    async def get_track(self, _id: str):
         """
         Retrieve information about a specific track by its ID.
         Args:
@@ -53,8 +74,8 @@ class SoundCloudClient:
         Raises:
             Exception: If the request to retrieve the track information fails.
         """
-        
-        return await self.__get_info_for_id('tracks',_id)
+
+        return await self.__get_info_for_id("tracks", _id)
 
     async def get_user(self, _id: str) -> dict:
         """
@@ -64,10 +85,10 @@ class SoundCloudClient:
         Returns:
             dict: A dictionary containing the user's information.
         """
-        
-        return await self.__get_info_for_id('users',_id)
-    
-    async def get_info_for_urn(self,urn:str):
+
+        return await self.__get_info_for_id("users", _id)
+
+    async def get_info_for_urn(self, urn: str):
         """
         Asynchronously retrieves information for a given URN (Uniform Resource Name).
         Args:
@@ -81,28 +102,35 @@ class SoundCloudClient:
             separated by colons. If the format is valid, the method delegates the
             retrieval to the private method `__get_info_for_id`.
         """
-        
-        urn = urn.split(':')
-        if urn.__len__ ==3:
-            return await self.__get_info_for_id(urn[1],urn[2])
+
+        urn = urn.split(":")
+        if urn.__len__ == 3:
+            return await self.__get_info_for_id(urn[1], urn[2])
         log.error("URN format is incorrect")
         raise ValueError("URN dot correct")
-    
-    async def __get_info_for_id(self,endpoint: str,_id: str):
+
+    async def __get_playlist_for_id(self, data: dict, limit: int = None) -> str:
+        if data.get("tracks") is None:
+            raise ValueError("Playlist not found or invalid ID")
+        data["tracks"] = [
+            await self.get_track(track["id"]) for track in data["tracks"][:limit]
+        ]
+        return data
+
+    async def __get_info_for_id(self, endpoint: str, _id: str):
         url = f"{self.BASE_URL}/{endpoint}/{_id}"
         return await self.__sponce(url=url)
 
-    async def __sponce(self,url,params=None)-> dict[str,any]|None:
+    async def __sponce(self, url, params=None) -> dict[str, any] | None:
         if params is None:
-            params = {
-                "client_id": self.client_id
-            }
-        log.info(f"Making GET request to %s",url)
+            params = {"client_id": self.client_id}
+        else:
+            params["client_id"] = self.client_id
+        log.debug(f"Making GET request to %s", url)
         async with aiohttp.ClientSession() as session:
-                async with session.get(url, params=params) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return data
-                    else:
-                        return None
-    
+            async with session.get(url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data
+                else:
+                    return None
