@@ -6,6 +6,8 @@ from aiosoundcloud import SoundCloud
 from aiosoundcloud.schemas import Track
 from disnake import FFmpegPCMAudio, VoiceClient
 
+from config import LIMIT_QUEUE
+
 from .exception import LimitQueue, NotConnectedVoice, NotPlaySound
 
 log = logging.getLogger(__name__)
@@ -51,9 +53,8 @@ class TrackQueue:
 class AudioPlayerSession:
     def __init__(self, voice_channel: disnake.VoiceChannel, api: SoundCloud) -> None:
         self._voice_channel = voice_channel
-        self.queue = TrackQueue(limit=25)
+        self.queue = TrackQueue(limit=LIMIT_QUEUE)
         self.__next_song_event = Event()
-        # self._is_playing_loop = False
         self._now_play_track: Track | None = None
         self.api = api
         self._vc: VoiceClient | None = None
@@ -61,9 +62,12 @@ class AudioPlayerSession:
     def __repr__(self) -> str:
         return f"<AudioPlayerSession voice_channel={self._voice_channel.id}>"
 
-    async def play(self, track: Track):
-        await self.queue.add(track)
-        if not self._vc:
+    async def play(self, *tracks: Track):
+        if tracks:
+            for track in tracks[: self.queue.LIMIT_QUEUE - self.queue.size()]:
+                await self.queue.add(track)
+
+        if not self._vc:  # Not connected to a voice channel
             create_task(self.__play())
 
     async def connect(self):
@@ -74,13 +78,14 @@ class AudioPlayerSession:
         await self.__play_loop()
         await self._vc.disconnect()
         self._vc = None
-        # self._is_playing_loop = False
 
     async def stop(self):
+        if not self._vc or not self._vc.is_connected():
+            raise NotConnectedVoice("Not connected to a voice channel")
         await self._vc.disconnect()
 
     async def skip(self):
-        if self._vc.is_playing():
+        if self._vc is None or not self._vc.is_playing():
             raise NotPlaySound("Bot don`t play sound")
         if self.queue.is_empty():
             await self._vc.disconnect()

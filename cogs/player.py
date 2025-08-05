@@ -3,9 +3,10 @@ import logging
 import disnake
 from disnake.ext import commands
 from aiosoundcloud import SoundCloud
+from aiosoundcloud.schemas import Track
 from .core import ManagementSession
 from .core.audio_player_session import AudioPlayerSession
-from .core.view import song_embed
+from .core import view
 from .core.exception import LimitQueue, NotConnectedVoice, NotPlaySound
 from config import CLIENT_ID
 
@@ -39,52 +40,40 @@ class Player(commands.Cog):
         name="play", description="Play a track from SoundCloud by name or link."
     )
     async def play(self, inter: disnake.ApplicationCommandInteraction, query: str = commands.Param(autocomplete=soundcloud_autocomplete)):  # type: ignore
-        try:
-            if not inter.author.voice:  # type: ignore
-                return await inter.send("You are not connected to a voice channel.")
-            session: AudioPlayerSession = await manager.get_session(inter.author.voice.channel)  # type: ignore
-            await inter.response.defer()
-            result = await api.search(query, limit=1)
 
-            if not result:
-                await inter.send("Song not found.")
-                return
+        if not inter.author.voice:  # type: ignore
+            return await inter.send("You are not connected to a voice channel.")
+        session: AudioPlayerSession = await manager.get_session(inter.author.voice.channel)  # type: ignore
+        await inter.response.defer()
+        result = await api.search(query, limit=1)
 
-            song = result[0]
-            await session.play(song)
-            embed = await song_embed(song)
+        if not result:
+            await inter.send("Song not found.")
+            return
 
-            await inter.send(embed=embed)
+        track = result[0]
+        await session.play(track)
+        embed = await view.track_embed(track)
 
-        except LimitQueue:
-            await inter.send(f"Queue is full, max {session.queue.LIMIT_QUEUE} songs.")  # type: ignore
+        await inter.send(embed=embed)
 
     @commands.slash_command(
         name="stop",
         description="Disconnect the bot from the voice channel and stop playback.",
     )
     async def stop(self, inter: disnake.ApplicationCommandInteraction):
-        try:
-            session = await manager.get_session(inter.author.voice.channel)  # type: ignore
-            await session.stop()
-            await inter.send("Disconnected.")
-            manager.sessions.remove(session)
-        except NotConnectedVoice:
-            await inter.send("You are not connected to a voice channel.")
+        session = await manager.get_session(inter.author.voice.channel)  # type: ignore
+        await session.stop()
+        await inter.send("Disconnected.")
+        manager.sessions.remove(session)
 
     @commands.slash_command(
         name="skip", description="Skip the current track in the queue."
     )
     async def skip(self, inter: disnake.ApplicationCommandInteraction):
-        try:
-            session = await manager.get_session(inter.author.voice.channel)  # type: ignore
-            await session.skip()
-            await inter.send("Skipped.")
-
-        except NotConnectedVoice:
-            await inter.send("Not connected to a voice channel.")
-        except NotPlaySound:
-            await inter.send("Sound not play!")
+        session = await manager.get_session(inter.author.voice.channel)  # type: ignore
+        await session.skip()
+        await inter.send("Skipped.")
 
     @commands.slash_command(name="queue", description="Show the current track queue.")
     async def show_queue(self, inter: disnake.ApplicationCommandInteraction):
@@ -104,16 +93,20 @@ class Player(commands.Cog):
             await inter.send("Queue empty!", ephemeral=True)
             return
 
-        description = ""
-        description += f"play now: {now_track.title} - {now_track.user.username}\n\n"
-        for idx, track in enumerate(queue, 1):
-            description += f"{idx}. {track.title} - {track.user.username}\n"
+        embed = view.queue_embed(session.get_track_play_now(), *queue)
+        await inter.send(embed=embed)
 
-        embed = disnake.Embed(
-            title="Current Queue",
-            description=description[:4096],  # Discord limit
-            color=disnake.Color.blue(),
+    @commands.slash_command(name="playlist", description="Play a playlist by URL.")
+    async def playlist(self, inter: disnake.ApplicationCommandInteraction, url: str):
+        await inter.response.defer()
+        session = await manager.get_session(inter.author.voice.channel)
+        # type: ignore
+        playlist = await api.get_playlist(
+            url, limit=session.queue.LIMIT_QUEUE - session.queue.size()
         )
+
+        await session.play(*playlist.tracks)
+        embed = await view.playlist_embed(playlist)
         await inter.send(embed=embed)
 
 

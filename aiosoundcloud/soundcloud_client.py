@@ -1,6 +1,8 @@
 import logging
+from typing import overload
 import aiohttp
 from cachetools import TTLCache
+
 
 log = logging.getLogger(__name__)
 
@@ -25,6 +27,28 @@ class SoundCloudClient:
         url = f"{self.BASE_URL}/search/tracks?q={query}"
         params = {"limit": limit, "client_id": self.client_id}
         return await self.__sponce(url=url, params=params)
+
+    @overload
+    async def get_playlist(self, _id: int, limit: int | None) -> dict: ...
+
+    @overload
+    async def get_playlist(self, url: str, limit: int | None) -> dict: ...
+
+    async def get_playlist(self, arg: str | int, limit: int | None) -> dict:
+        """
+        Retrieves a playlist by its ID or URL from SoundCloud.
+        """
+        # Якщо це int, конвертуємо в str
+        if isinstance(arg, int) or (isinstance(arg, str) and arg.isdigit()):
+            arg_str = str(arg)
+            data = await self.__get_info_for_id("playlists", arg_str)
+            return await self.__get_playlist_for_id(data, limit=limit)
+
+        elif isinstance(arg, str) and arg.startswith("https://soundcloud.com/"):
+            data = await self.fetch_resolved_url_info(arg)
+            return await self.__get_playlist_for_id(data, limit=limit)
+
+        raise ValueError("Invalid playlist identifier")
 
     async def fetch_resolved_url_info(self, url: str) -> dict:
         """
@@ -85,6 +109,14 @@ class SoundCloudClient:
         log.error("URN format is incorrect")
         raise ValueError("URN dot correct")
 
+    async def __get_playlist_for_id(self, data: dict, limit: int = None) -> str:
+        if data.get("tracks") is None:
+            raise ValueError("Playlist not found or invalid ID")
+        data["tracks"] = [
+            await self.get_track(track["id"]) for track in data["tracks"][:limit]
+        ]
+        return data
+
     async def __get_info_for_id(self, endpoint: str, _id: str):
         url = f"{self.BASE_URL}/{endpoint}/{_id}"
         return await self.__sponce(url=url)
@@ -92,6 +124,8 @@ class SoundCloudClient:
     async def __sponce(self, url, params=None) -> dict[str, any] | None:
         if params is None:
             params = {"client_id": self.client_id}
+        else:
+            params["client_id"] = self.client_id
         log.debug(f"Making GET request to %s", url)
         async with aiohttp.ClientSession() as session:
             async with session.get(url, params=params) as response:

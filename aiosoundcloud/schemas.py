@@ -259,3 +259,66 @@ class Track:
             ],
             user=User.from_dict(data.get("user", {})),
         )
+
+
+# === PLAYLIST MODEL ===
+
+
+@dataclass
+class Playlist:
+    id: int
+    kind: str
+    title: str
+    description: Optional[str]
+    artwork_url: Optional[str]
+    permalink: str
+    permalink_url: str
+    uri: str
+    user_id: int
+    user: User
+    created_at: str
+    last_modified: str
+    published_at: str
+    display_date: str
+    genre: Optional[str]
+    license: str
+    likes_count: int
+    reposts_count: int
+    track_count: int
+    tracks: List[Track]
+    tag_list: Optional[str]
+    is_album: bool
+    public: bool
+    sharing: str
+
+    @staticmethod
+    def from_dict(data: Dict[str, Any]) -> "Playlist":
+        return Playlist(
+            id=data.get("id"),
+            kind=data.get("kind", ""),
+            title=data.get("title", ""),
+            description=data.get("description"),
+            artwork_url=data.get("artwork_url"),
+            permalink=data.get("permalink", ""),
+            permalink_url=data.get("permalink_url", ""),
+            uri=data.get("uri", ""),
+            user_id=data.get("user_id"),
+            user=User.from_dict(data.get("user", {})),
+            created_at=data.get("created_at", ""),
+            last_modified=data.get("last_modified", ""),
+            published_at=data.get("published_at", ""),
+            display_date=data.get("display_date", ""),
+            genre=data.get("genre"),
+            license=data.get("license", ""),
+            likes_count=data.get("likes_count", 0),
+            reposts_count=data.get("reposts_count", 0),
+            track_count=data.get("track_count", 0),
+            tracks=[
+                track if isinstance(track, Track) else Track.from_dict(track)
+                for track in data.get("tracks", [])
+            ],
+            tag_list=data.get("tag_list"),
+            is_album=data.get("is_album", False),
+            public=data.get("public", True),
+            sharing=data.get("sharing", ""),
+        )

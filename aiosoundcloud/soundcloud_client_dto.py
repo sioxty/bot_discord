@@ -1,7 +1,8 @@
 import re
+from typing import overload
 import aiohttp
 from .soundcloud_client import SoundCloudClient
-from .schemas import Track, User
+from .schemas import Playlist, Track, User
 from cachetools import cached, TTLCache
 import logging
 
@@ -12,8 +13,10 @@ cache = TTLCache(maxsize=100, ttl=60 * 60)
 
 
 class SoundCloud(SoundCloudClient):
-    async def search(self, query: str, limit: int = 10) -> list[Track]:
+    async def search(self, query: str, limit: int = 10):
         response = await super().search(query, limit)
+        if not response or not isinstance(response, dict):
+            return []
         return [Track.from_dict(item) for item in response.get("collection", [])]
 
     async def get_track(self, _id):
@@ -50,3 +53,12 @@ class SoundCloud(SoundCloudClient):
                         stream_url: str = stream_info["url"]
                         break
             return stream_url
+
+    @overload
+    async def get_playlist(self, _id: int, limit: int | None) -> Playlist: ...
+
+    @overload
+    async def get_playlist(self, url: str, limit: int | None) -> Playlist: ...
+
+    async def get_playlist(self, arg: str | int, limit: int | None) -> Playlist:
+        return Playlist.from_dict(await super().get_playlist(arg, limit))
