@@ -21,7 +21,7 @@ async def track_embed(track: Track) -> Embed:
 async def playlist_embed(playlist: Playlist) -> Embed:
     embed = Embed(
         title=playlist.title,
-        description=track_list_embed(playlist.tracks),
+        description=track_list(playlist.tracks),
         url=playlist.permalink_url,
     )
     embed.set_thumbnail(url=playlist.artwork_url or "")
@@ -39,7 +39,7 @@ def queue_embed(*track: Track) -> Embed:
         title="Current Queue",
         description=(
             f"play now: [{track[0].title} - {track[0].user.username  }]({track[0].permalink_url})\n\n"
-            + track_list_embed(track[1:])
+            + track_list(track[1:])
         )[
             :4096
         ],  # Discord limit
@@ -47,7 +47,15 @@ def queue_embed(*track: Track) -> Embed:
     return embed
 
 
-def track_list_embed(tracks: list[Track]) -> str:
+def embed_track_list(title: str, tracks: list[Track]) -> Embed:
+    embed = Embed(
+        title=title,
+        description=track_list(tracks),
+    )
+    return embed
+
+
+def track_list(tracks: list[Track]) -> str:
     return "\n".join(
         f"{i}. [{track.title} - {track.user.username}]({track.permalink_url})"
         for i, track in enumerate(tracks, 1)

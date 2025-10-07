@@ -100,11 +100,21 @@ class Player(commands.Cog):
     async def playlist(self, inter: disnake.ApplicationCommandInteraction, url: str):
         await inter.response.defer()
         session = await manager.get_session(inter.author.voice.channel)
-        # type: ignore
-        playlist = await api.get_playlist(
-            url, limit=session.queue.LIMIT_QUEUE - session.queue.size()
-        )
+        limit = session.queue.LIMIT_QUEUE - session.queue.size()
 
+        if not url.startswith(api.SHORT_URL_PREFIX) and not url.startswith(
+            api.STANDARD_URL
+        ):
+            playlists = await api.search_playlists(
+                query=url, limit=1, track_limit=limit
+            )
+            playlist = playlists[0] if playlists else None
+        else:
+            playlist = await api.get_playlist(url, limit=limit)
+        if not playlist:
+            await inter.send("Playlist not found", ephemeral=True)
+            manager.sessions.remove(session)
+            return
         await session.play(*playlist.tracks)
         embed = await view.playlist_embed(playlist)
         await inter.send(embed=embed)

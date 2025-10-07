@@ -13,8 +13,8 @@ cache = TTLCache(maxsize=100, ttl=60 * 60)
 
 
 class SoundCloud(SoundCloudClient):
-    async def search(self, query: str, limit: int = 10):
-        response = await super().search(query, limit)
+    async def search(self, query: str = "", limit: int = 10, genre: str | None = None):
+        response = await super().search(query, limit, genre=genre)
         if not response or not isinstance(response, dict):
             return []
         return [Track.from_dict(item) for item in response.get("collection", [])]
@@ -25,7 +25,7 @@ class SoundCloud(SoundCloudClient):
     async def get_user(self, _id):
         return User.from_dict(await super().get_user(_id))
 
-    async def get_stream_url(self, track: Track) -> str:
+    async def get_stream_url(self, track: Track) -> str | None:
         """
         Fetches the stream URL for a given track.
         This method retrieves the streaming URL for a track by iterating through
@@ -52,6 +52,9 @@ class SoundCloud(SoundCloudClient):
                         stream_info = await resp.json()
                         stream_url: str = stream_info["url"]
                         break
+            else:
+                log.warning(f"No progressive format found for track {track.id}")
+                return None  # or raise an exception if preferred
             return stream_url
 
     @overload

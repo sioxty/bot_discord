@@ -108,6 +108,10 @@ class AudioPlayerSession:
                 self.__next_song_event.set()
 
             stream_url = await self.api.get_stream_url(track)
+            if not stream_url:
+                log.error("No stream URL found for the track.")
+                self.queue.task_done()
+                continue
             self._vc.play(
                 FFmpegPCMAudio(stream_url, **FFMPEG_OPTIONS), after=after_playing
             )

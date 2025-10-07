@@ -1,18 +1,20 @@
 import logging
 from typing import overload
 import aiohttp
-from cachetools import TTLCache
-
 
 log = logging.getLogger(__name__)
 
 
 class SoundCloudClient:
     def __init__(self, client_id: str):
-        self.BASE_URL = "https://api-v2.soundcloud.com"
+        self.BASE_URL: str = "https://api-v2.soundcloud.com"
         self.client_id: str = client_id
+        self.SHORT_URL_PREFIX: str = "https://on.soundcloud.com/"
+        self.STANDARD_URL: str = "https://soundcloud.com/"
 
-    async def search(self, query: str, limit: int = 10) -> dict:
+    async def search(
+        self, query: str = "", limit: int = 10, genre: str | None = None
+    ) -> dict:
         """
         Searches for tracks on SoundCloud based on the given query.
         Args:
@@ -23,10 +25,30 @@ class SoundCloudClient:
         Raises:
             Exception: If the request to the SoundCloud API fails or returns an error.
         """
+        return await self.__search(query, limit, genre=genre, _type="tracks")
 
-        url = f"{self.BASE_URL}/search/tracks?q={query}"
-        params = {"limit": limit, "client_id": self.client_id}
-        return await self.__sponce(url=url, params=params)
+    async def search_playlists(
+        self,
+        query: str = "",
+        limit: int = 10,
+        genre: str | None = None,
+        track_limit: int | None = None,
+    ) -> dict:
+        """
+        Searches for playlists on SoundCloud based on the given query.
+        Args:
+            query (str): The search query string to look for playlists.
+            limit (int, optional): The maximum number of results to return. Defaults to 10.
+        Returns:
+            dict: A dictionary containing the search results.
+        Raises:
+            Exception: If the request to the SoundCloud API fails or returns an error.
+        """
+        data = await self.__search(query, limit, genre=genre, _type="playlists")
+        playlists: list[dict] = []
+        for playlist in data["collection"]:
+            playlists.append(await self.get_playlist(playlist["id"], limit=track_limit))
+        return playlists
 
     @overload
     async def get_playlist(self, _id: int, limit: int | None) -> dict: ...
@@ -44,7 +66,10 @@ class SoundCloudClient:
             data = await self.__get_info_for_id("playlists", arg_str)
             return await self.__get_playlist_for_id(data, limit=limit)
 
-        elif isinstance(arg, str) and arg.startswith("https://soundcloud.com/"):
+        elif isinstance(arg, str) and (
+            arg.startswith("https://soundcloud.com/")
+            or arg.startswith(self.SHORT_URL_PREFIX)
+        ):
             data = await self.fetch_resolved_url_info(arg)
             return await self.__get_playlist_for_id(data, limit=limit)
 
@@ -60,7 +85,8 @@ class SoundCloudClient:
         Returns:
             dict: A dictionary containing the resolved information for the given URL.
         """
-
+        if url.startswith(self.SHORT_URL_PREFIX):
+            url = await self.__resolve_short(url)
         url = f"{self.BASE_URL}/resolve?url={url}"
         return await self.__sponce(url=url)
 
@@ -110,6 +136,8 @@ class SoundCloudClient:
         raise ValueError("URN dot correct")
 
     async def __get_playlist_for_id(self, data: dict, limit: int = None) -> str:
+        if data is None:
+            raise ValueError("Playlist not found or invalid ID")
         if data.get("tracks") is None:
             raise ValueError("Playlist not found or invalid ID")
         data["tracks"] = [
@@ -121,7 +149,9 @@ class SoundCloudClient:
         url = f"{self.BASE_URL}/{endpoint}/{_id}"
         return await self.__sponce(url=url)
 
-    async def __sponce(self, url, params=None) -> dict[str, any] | None:
+    async def __sponce(
+        self, url: str, params: dict[str, any] | None = None
+    ) -> dict[str, any] | None:
         if params is None:
             params = {"client_id": self.client_id}
         else:
@@ -132,5 +162,42 @@ class SoundCloudClient:
                 if response.status == 200:
                     data = await response.json()
                     return data
+                elif response.status == 401:
+                    log.error("Unauthorized access - client_id")
                 else:
+                    log.error(f"Request failed with status code {response.status}")
                     return None
+
+    async def __resolve_short(self, short_url: str) -> dict:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(short_url, allow_redirects=False) as resp:
+                if "Location" not in resp.headers:
+                    log.error("No Location header found")
+                    return None
+                real_url = resp.headers["Location"]
+                return real_url
+
+    async def __search(
+        self,
+        query: str,
+        limit: int = 10,
+        genre: str | None = None,
+        _type: str = "tracks",
+    ) -> dict:
+        """
+        Searches for tracks on SoundCloud based on the given query.
+        Args:
+            query (str): The search query string to look for tracks.
+            limit (int, optional): The maximum number of results to return. Defaults to 10.
+        Returns:
+            dict: A dictionary containing the search results.
+        Raises:
+            Exception: If the request to the SoundCloud API fails or returns an error.
+        """
+
+        url = f"{self.BASE_URL}/search/{_type}?q={query}"
+
+        params = {"limit": limit}
+        if genre:
+            params["filter.genre_or_tag"] = genre
+        return await self.__sponce(url=url, params=params)

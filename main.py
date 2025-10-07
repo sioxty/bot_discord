@@ -25,6 +25,7 @@ for filename in os.listdir(directory):
 @bot.event
 async def on_ready():
     CLIENT_ID = await get_client_id()
+    log.info(f"Client ID set: {CLIENT_ID}")
     log.info(f"Bot is ready {bot.user.name}#{bot.user.discriminator}")
 
 
