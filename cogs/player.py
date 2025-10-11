@@ -12,7 +12,7 @@ from config import CLIENT_ID
 
 
 log = logging.getLogger(__name__)
-api = SoundCloud(client_id=CLIENT_ID)
+api = SoundCloud()
 manager = ManagementSession(api=api)
 
 

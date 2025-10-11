@@ -12,11 +12,9 @@ logging.basicConfig(
 
 
 async def main():
-    client = SoundCloud(client_id=CLIENT_ID)
-    result = await client.get_playlist(
-        "https://soundcloud.com/maksim-slushayev/sets/playstyle", limit=10
-    )
-    print(result.title)
+    client = SoundCloud()
+    result = await client.search("Imagine Dragons Believer")
+    print(result[0].title)
 
 
 if __name__ == "__main__":

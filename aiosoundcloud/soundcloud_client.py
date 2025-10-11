@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import overload
 import aiohttp
 
@@ -6,9 +7,9 @@ log = logging.getLogger(__name__)
 
 
 class SoundCloudClient:
-    def __init__(self, client_id: str):
+    def __init__(self):
         self.BASE_URL: str = "https://api-v2.soundcloud.com"
-        self.client_id: str = client_id
+        self.client_id: str = None
         self.SHORT_URL_PREFIX: str = "https://on.soundcloud.com/"
         self.STANDARD_URL: str = "https://soundcloud.com/"
 
@@ -152,10 +153,14 @@ class SoundCloudClient:
     async def __sponce(
         self, url: str, params: dict[str, any] | None = None
     ) -> dict[str, any] | None:
+        if self.client_id is None:
+            await self.__extract_soundcloud_client_id()
+
         if params is None:
             params = {"client_id": self.client_id}
         else:
             params["client_id"] = self.client_id
+
         log.debug(f"Making GET request to %s", url)
         async with aiohttp.ClientSession() as session:
             async with session.get(url, params=params) as response:
@@ -163,7 +168,21 @@ class SoundCloudClient:
                     data = await response.json()
                     return data
                 elif response.status == 401:
-                    log.error("Unauthorized access - client_id")
+                    log.error(
+                        "Unauthorized access - client_id. Trying to refresh client_id..."
+                    )
+                    await self.__extract_soundcloud_client_id()
+                    # Оновлюємо client_id у params
+                    params["client_id"] = self.client_id
+                    # Повторна спроба
+                    async with session.get(url, params=params) as retry_response:
+                        if retry_response.status == 200:
+                            data = await retry_response.json()
+                            return data
+                        log.error(
+                            f"Retry failed with status code {retry_response.status}"
+                        )
+                        return None
                 else:
                     log.error(f"Request failed with status code {response.status}")
                     return None
@@ -201,3 +220,30 @@ class SoundCloudClient:
         if genre:
             params["filter.genre_or_tag"] = genre
         return await self.__sponce(url=url, params=params)
+
+    async def __extract_soundcloud_client_id(self) -> str:
+        """
+        Asynchronously retrieves the SoundCloud client ID by parsing the SoundCloud homepage
+        and its associated JavaScript files.
+        Args:
+            session (aiohttp.ClientSession): An active aiohttp session used to perform HTTP requests.
+        Returns:
+            str: The extracted SoundCloud client ID.
+        Raises:
+            RuntimeError: If the client ID cannot be found in the JavaScript files.
+        """
+        async with aiohttp.ClientSession() as session:
+            async with session.get(self.STANDARD_URL) as resp:
+                html = await resp.text()
+
+            js_urls = re.findall(
+                r'src="(https://a-v2\.sndcdn\.com/assets/\w+-\w+\.js)"', html
+            )
+            for js_url in js_urls:
+                async with session.get(js_url) as js_resp:
+                    js = await js_resp.text()
+                    match = re.search(r'client_id\s*:\s*"(?P<client_id>\w+)"', js)
+                    if match:
+                        self.client_id = match.group("client_id")
+        if not self.client_id:
+            raise RuntimeError("client_id not found")
