@@ -4,16 +4,13 @@ import disnake
 from disnake.ext import commands
 from aiosoundcloud import SoundCloud
 from aiosoundcloud.schemas import Track
-from .core import ManagementSession
-from .core.audio_player_session import AudioPlayerSession
+from .core.audio_player_session import manager, AudioPlayer
 from .core import view
 from .core.exception import LimitQueue, NotConnectedVoice, NotPlaySound
-from config import CLIENT_ID
+from config import api
 
 
 log = logging.getLogger(__name__)
-api = SoundCloud()
-manager = ManagementSession(api=api)
 
 
 async def soundcloud_autocomplete(inter, string: str):
@@ -43,7 +40,7 @@ class Player(commands.Cog):
 
         if not inter.author.voice:  # type: ignore
             return await inter.send("You are not connected to a voice channel.")
-        session: AudioPlayerSession = await manager.get_session(inter.author.voice.channel)  # type: ignore
+        session: AudioPlayer = await manager.connect_session(inter.author.voice.channel)  # type: ignore
         await inter.response.defer()
         result = await api.search(query, limit=1)
 
@@ -62,25 +59,25 @@ class Player(commands.Cog):
         description="Disconnect the bot from the voice channel and stop playback.",
     )
     async def stop(self, inter: disnake.ApplicationCommandInteraction):
-        session = await manager.get_session(inter.author.voice.channel)  # type: ignore
+        session = await manager.connect_session(inter.author.voice.channel)  # type: ignore
         await session.stop()
         await inter.send("Disconnected.")
-        manager.sessions.remove(session)
+        manager.close(session)
 
     @commands.slash_command(
         name="skip", description="Skip the current track in the queue."
     )
     async def skip(self, inter: disnake.ApplicationCommandInteraction):
-        session = await manager.get_session(inter.author.voice.channel)  # type: ignore
+        session = await manager.connect_session(inter.author.voice.channel)  # type: ignore
         await session.skip()
         await inter.send("Skipped.")
 
     @commands.slash_command(name="queue", description="Show the current track queue.")
     async def show_queue(self, inter: disnake.ApplicationCommandInteraction):
         if manager.is_session(inter.author.voice.channel):
-            inter.send("Player not play", ephemeral=True)
+            await inter.send("Player not play", ephemeral=True)
             return
-        session = await manager.get_session(inter.author.voice.channel)  # type: ignore
+        session = await manager.connect_session(inter.author.voice.channel)  # type: ignore
         queue = session.queue.as_list()
         now_track = session.get_track_play_now()
         if not queue:
@@ -99,7 +96,7 @@ class Player(commands.Cog):
     @commands.slash_command(name="playlist", description="Play a playlist by URL.")
     async def playlist(self, inter: disnake.ApplicationCommandInteraction, url: str):
         await inter.response.defer()
-        session = await manager.get_session(inter.author.voice.channel)
+        session = await manager.connect_session(inter.author.voice.channel)
         limit = session.queue.LIMIT_QUEUE - session.queue.size()
 
         if not url.startswith(api.SHORT_URL_PREFIX) and not url.startswith(
@@ -113,7 +110,7 @@ class Player(commands.Cog):
             playlist = await api.get_playlist(url, limit=limit)
         if not playlist:
             await inter.send("Playlist not found", ephemeral=True)
-            manager.sessions.remove(session)
+            manager.close(session)
             return
         await session.play(*playlist.tracks)
         embed = await view.playlist_embed(playlist)

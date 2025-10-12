@@ -1,1 +1,1 @@
-from .audio_player_session import ManagementSession
+from .audio_player_session import PlayerManager

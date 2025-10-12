@@ -13,7 +13,7 @@ logging.basicConfig(
 
 async def main():
     client = SoundCloud()
-    result = await client.search("Imagine Dragons Believer")
+    result = await client.search("Imagine Dragons Believer", limit=1)
     print(result[0].title)
 
 

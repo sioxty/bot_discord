@@ -7,9 +7,9 @@ log = logging.getLogger(__name__)
 
 
 class SoundCloudClient:
-    def __init__(self):
+    def __init__(self, client_id: str | None = None):
         self.BASE_URL: str = "https://api-v2.soundcloud.com"
-        self.client_id: str = None
+        self.client_id: str | None = client_id
         self.SHORT_URL_PREFIX: str = "https://on.soundcloud.com/"
         self.STANDARD_URL: str = "https://soundcloud.com/"
 
