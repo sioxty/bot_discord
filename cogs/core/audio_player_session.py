@@ -2,7 +2,6 @@ import logging
 from asyncio import Queue, Event, create_task
 
 import disnake
-from aiosoundcloud import SoundCloud
 from aiosoundcloud.schemas import Track
 from disnake import FFmpegPCMAudio, VoiceClient
 

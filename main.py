@@ -5,7 +5,7 @@ import os
 from aiosoundcloud import get_client_id
 
 from cogs.core.exception import BaseBotException
-from config import TOKEN, CLIENT_ID
+from config import TOKEN
 
 bot = commands.Bot(command_prefix="!", intents=disnake.Intents.all())
 

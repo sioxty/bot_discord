@@ -16,3 +16,9 @@ __license__ = "MIT"
 from .soundcloud_client import SoundCloudClient
 from .soundcloud_client_dto import SoundCloud
 from .utils import get_client_id
+
+__all__ = [
+    "SoundCloudClient",
+    "SoundCloud",
+    "get_client_id",
+]

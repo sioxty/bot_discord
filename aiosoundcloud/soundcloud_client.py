@@ -161,7 +161,7 @@ class SoundCloudClient:
         else:
             params["client_id"] = self.client_id
 
-        log.debug(f"Making GET request to %s", url)
+        log.debug("Making GET request to %s", url)
         async with aiohttp.ClientSession() as session:
             async with session.get(url, params=params) as response:
                 if response.status == 200:

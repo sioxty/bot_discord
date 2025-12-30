@@ -1,9 +1,8 @@
-import re
 from typing import overload
 import aiohttp
 from .soundcloud_client import SoundCloudClient
 from .schemas import Playlist, Track, User
-from cachetools import cached, TTLCache
+from cachetools import TTLCache
 import logging
 
 log = logging.getLogger(__name__)

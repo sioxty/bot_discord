@@ -2,11 +2,8 @@ import logging
 
 import disnake
 from disnake.ext import commands
-from aiosoundcloud import SoundCloud
-from aiosoundcloud.schemas import Track
 from .core.audio_player_session import manager, AudioPlayer
 from .core import view
-from .core.exception import LimitQueue, NotConnectedVoice, NotPlaySound
 from config import api
 
 
